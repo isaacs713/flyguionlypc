@@ -1,0 +1,130 @@
+local Players = game.Players.LocalPlayer
+local flygui = Instance.new("ScreenGui")
+flygui.Name = "flygui"
+flygui.Parent = Players:WaitForChild("PlayerGui")
+local flyBtn = Instance.new("TextButton")
+flyBtn.Size = UDim2.new(0, 120, 0, 44)
+flyBtn.Position = UDim2.new(0, 24, 0, 24)
+flyBtn.BackgroundColor3 = Color3.fromRGB(255, 38, 0)
+flyBtn.Text = "Fly: OFF"
+flyBtn.TextColor3 = Color3.new(1, 1, 1)
+flyBtn.Font = Enum.Font.FredokaOne
+flyBtn.TextSize = 28
+flyBtn.Parent = flygui
+local roundcornerflybutton = Instance.new("UICorner", flyBtn)
+roundcornerflybutton.Parent = flyBtn
+local roundcornertop = Instance.new("UICorner")
+roundcornertop.CornerRadius = UDim.new(0,9)
+local flying = false
+local bodyGyro = nil
+local bodyVelocity = nil
+local flySpeed = 60
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local moveDirection = Vector3.new(0, 0, 0)
+local function getMoveDirection()
+	local dir = Vector3.new(0, 0, 0)
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+		dir = dir + Vector3.new(0, 0, 1)
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+		dir = dir + Vector3.new(0, 0, -1)
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+		dir = dir + Vector3.new(-1, 0, 0)
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+		dir = dir + Vector3.new(1, 0, 0)
+	end
+	return dir
+end
+local thumbstickDir = Vector3.new(0, 0, 0)
+UserInputService.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch and input.Position then
+	elseif input.UserInputType == Enum.UserInputType.Gamepad1 then
+		if input.KeyCode == Enum.KeyCode.Thumbstick1 then
+			thumbstickDir = Vector3.new(input.Position.X, 0, -input.Position.Y)
+		end
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Gamepad1 and input.KeyCode == Enum.KeyCode.Thumbstick1 then
+		thumbstickDir = Vector3.new(0, 0, 0)
+	end
+end)
+local function startFlying()
+	local character = Players.Character
+	if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	bodyGyro = Instance.new("BodyGyro")
+	bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
+	bodyGyro.P = 10000
+	bodyGyro.Parent = root
+
+	bodyVelocity = Instance.new("BodyVelocity")
+	bodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)
+	bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+	bodyVelocity.Parent = root
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.PlatformStand = true
+		flyBtn.BackgroundColor3 = Color3.fromRGB(0, 249, 0)
+	end
+
+	flying = true
+	flyBtn.Text = "Fly:on"
+end
+local function stopFlying()
+	local character = Players.Character
+	if not character then return end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	if bodyGyro then bodyGyro:Destroy() bodyGyro = nil end
+	if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.PlatformStand = false
+		flyBtn.BackgroundColor3 = Color3.fromRGB(255, 38, 0)
+	end
+
+	flying = false
+	flyBtn.Text = "Fly:off"
+end
+flyBtn.MouseButton1Click:Connect(function()
+	if flying then
+		stopFlying()
+	else
+		startFlying()
+	end
+end)
+Players.CharacterAdded:Connect(function()
+	if flying then
+		stopFlying()
+	end
+end)
+RunService.RenderStepped:Connect(function()
+	if flying then
+		local character = Players.Character
+		if not character then stopFlying() return end
+		local root = character:FindFirstChild("HumanoidRootPart")
+		if not root then stopFlying() return end
+		local cam = workspace.CurrentCamera
+		if bodyGyro then
+			bodyGyro.CFrame = CFrame.new(root.Position, root.Position + cam.CFrame.LookVector)
+		end
+		local dir = getMoveDirection()
+		if thumbstickDir.Magnitude > 0 then
+			dir = thumbstickDir
+		end
+		if dir.Magnitude > 0 then
+			dir = dir.Unit
+			local moveVec = (cam.CFrame.RightVector * dir.X + cam.CFrame.LookVector * dir.Z)
+			bodyVelocity.Velocity = moveVec * flySpeed
+		else
+			bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+		end
+	end
+end)
